@@ -8,10 +8,10 @@ serialisable appliable state differ
 var viscous = require('viscous');
 
 var state1 = {},
-    differ1 = viscous();
+    differ1 = viscous(state1);
 
 var state2 = {},
-    differ2 = viscous();
+    differ2 = viscous(state2);
 
 state1.x = 10; // assign a value
 state1.y = state1; // assign an instance (in this case cyclic)

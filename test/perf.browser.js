@@ -1,3 +1,4 @@
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var same = require('same-value');
 
 function isInstance(value){
@@ -211,3 +212,53 @@ function viscous(state){
 }
 
 module.exports = viscous;
+
+},{"same-value":2}],2:[function(require,module,exports){
+module.exports = function isSame(a, b){
+    if(a === b){
+        return true;
+    }
+
+    if(
+        typeof a !== typeof b ||
+        typeof a === 'object' &&
+        !(a instanceof Date && b instanceof Date)
+    ){
+        return false;
+    }
+
+    return String(a) === String(b);
+};
+},{}],3:[function(require,module,exports){
+
+var viscous = require('../');
+
+var state1 = {},
+    differ1 = viscous(state1);
+
+var state2 = {},
+    differ2 = viscous(state2);
+
+var run = setInterval(function(){
+
+    var changyness = Math.random() * 5;
+
+    for(var i = 0; i < 100; i++){
+        state1[i] = state1[i] || {};
+        for(var j = 0; j < 100; j++){
+            state1[i][j] = state1[i][j] || {};
+            state1[i][j].a = Math.floor(Math.random() * changyness);
+        }
+    }
+
+    var now = Date.now();
+    var changes = differ1.changes();
+    console.log(Date.now() - now, changes.length);
+    differ2.apply(changes);
+    console.log(Date.now() - now);
+}, 100);
+
+setTimeout(function(){
+    clearInterval(run);
+}, 4000);
+},{"../":1}]},{},[3]);
