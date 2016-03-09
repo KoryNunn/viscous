@@ -11,7 +11,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "same-value": "^1.0.1"
+    "same-value": "^1.0.1",
+    "statham": "^1.2.0"
   },
   "devDependencies": {
     "statham": "^1.0.2",

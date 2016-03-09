@@ -54,8 +54,8 @@ test('deep instances', function(t){
 
     t.deepEqual(differ.changes(), [
         [
-            ['1', a.x],
-            ['2', a.x.y]
+            ['2', a.x.y],
+            ['1', a.x]
         ],
         ['1', 'y','a', ['2']],
         ['0', 'x','a', ['1']]
@@ -102,8 +102,8 @@ test('deep instances removed', function(t){
 
     t.deepEqual(differ.changes(), [
         [
-            ['1', a.x],
-            ['2', a.x.y]
+            ['2', a.x.y],
+            ['1', a.x]
         ],
         ['1', 'y','a', ['2']],
         ['0', 'x','a', ['1']]
@@ -164,8 +164,8 @@ test('functions', function(t){
 
     t.deepEqual(differ.changes(), [
         [
+            ['2', a.x.y],
             ['1', a.x],
-            ['2', a.x.y]
         ],
         ['1', 'y','a', ['2']],
         ['0', 'x','a', ['1']]
@@ -186,8 +186,8 @@ test('arrays', function(t){
 
     t.deepEqual(differ.changes(), [
         [
-            ['1', a.x],
-            ['2', obj]
+            ['2', obj],
+            ['1', a.x]
         ],
         ['1', '0','a', ['2']],
         ['1', '1','a', 1],
@@ -215,11 +215,11 @@ test('state', function(t){
     a.x = {};
     a.x.y = {};
 
-    t.deepEqual(differ.state(), [
-        ['0', a],
+    t.deepEqual(differ.state(), [[
+        ['2', a.x.y],
         ['1', a.x],
-        ['2', a.x.y]
-    ]);
+        ['0', a]
+    ]]);
 
 });
 
