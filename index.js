@@ -21,6 +21,19 @@ function objectRemovedChanges(scope, object){
     }
 }
 
+function createInstanceInfo(scope, id, value){
+    var lastInfo = {
+        id: id,
+        instance: value,
+        lastState: {},
+        occurances: false
+    };
+    scope.instances[lastInfo.id] = value;
+    scope.trackedMap.set(value, lastInfo);
+
+    return lastInfo;
+}
+
 function getInstanceInfo(scope, value){
     if(!isInstance(value)){
         return;
@@ -29,14 +42,7 @@ function getInstanceInfo(scope, value){
     var lastInfo = scope.trackedMap.get(value);
 
     if(!lastInfo){
-        lastInfo = {
-            id: scope.getId(),
-            instance: value,
-            lastState: {},
-            occurances: false
-        };
-        scope.instances[lastInfo.id] = value;
-        scope.trackedMap.set(value, lastInfo);
+        lastInfo = createInstanceInfo(scope, scope.getId(), value);
     }
 
     return lastInfo;
@@ -113,6 +119,23 @@ function getCurrentChanges(scope, changes, lastInfo, object, scanned, instanceCh
     }
 }
 
+function createInstanceDefinition(scope, instance){
+    var value = instance;
+    if(typeof value === 'function'){
+        value = function(){return instance.apply(this, arguments)};
+    }
+    if(typeof value === 'object'){
+        value = Array.isArray(value) ? [] : {};
+    }
+
+    for(var key in instance){
+        var id = scope.viscous.getId(instance[key]);
+        value[key] = id ? [id] : instance[key];
+    }
+
+    return value;
+}
+
 function getObjectChanges(scope, object, scanned){
     var lastInfo = getInstanceInfo(scope, object),
         newKeys,
@@ -140,7 +163,7 @@ function getObjectChanges(scope, object, scanned){
     getCurrentChanges(scope, changes, lastInfo, object, scanned, instanceChanges);
 
     if(isNew){
-        instanceChanges.push([lastInfo.id, object]);
+        instanceChanges.push([lastInfo.id, createInstanceDefinition(scope, object)]);
     }
 
     return {
@@ -170,12 +193,12 @@ function changes(){
 }
 
 function getState(){
-    var state = this;
+    var scope = this;
 
-    state.viscous.changes();
+    scope.viscous.changes();
 
-    return [Object.keys(state.instances).reverse().map(function(key){
-        return [key, state.instances[key]];
+    return [Object.keys(scope.instances).reverse().map(function(key){
+        return [key, createInstanceDefinition(scope, scope.instances[key])];
     })];
 }
 
@@ -190,18 +213,30 @@ function applyRootChange(scope, newState){
     }
 }
 
+function inflateDefinition(scope, definition){
+    for(var key in definition){
+        if(Array.isArray(definition[key])){
+            definition[key] = scope.viscous.getInstance(definition[key]);
+        }
+    }
+}
+
 function apply(changes){
     var scope = this,
         instanceChanges = changes[0];
 
     instanceChanges.forEach(function(instanceChange){
         if(instanceChange[1] === 'r'){
+            var instance = scope.instances[instanceChange[0]];
+            scope.trackedMap.delete(instance);
             delete scope.instances[instanceChange[0]];
         }else{
             if(scope.instances[instanceChange[0]] === scope.state){
+                inflateDefinition(scope, instanceChange[1]);
                 applyRootChange(scope, instanceChange[1]);
             }else{
-                scope.instances[instanceChange[0]] = instanceChange[1];
+                inflateDefinition(scope, instanceChange[1]);
+                createInstanceInfo(scope, instanceChange[0], instanceChange[1]);
             }
         }
     });
