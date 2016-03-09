@@ -16,6 +16,9 @@ var run = setInterval(function(){
         for(var j = 0; j < 100; j++){
             state1[i][j] = state1[i][j] || {};
             state1[i][j].a = Math.floor(Math.random() * changyness);
+            if(!Math.floor(Math.random() * 10)){
+                state1[i][j].b = {};
+            }
         }
     }
 

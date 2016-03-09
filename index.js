@@ -21,70 +21,73 @@ function objectRemovedChanges(scope, object){
     }
 }
 
-function getRemovedChanges(scope, changes, lastInfo, oldKeys, currentKeys){
-    oldKeys
-    .reduce(function(result, oldKey){
-        if(!~currentKeys.indexOf(oldKey)){
-            var oldValue = lastInfo.lastState[oldKey];
-            result.push([lastInfo.id, oldKey, 'r']);
+function getRemovedChange(scope, changes, lastInfo, object, oldKey){
+    if(!(oldKey in object)){
+        var oldValue = lastInfo.lastState[oldKey];
+        changes.push([lastInfo.id, oldKey, 'r']);
 
-            if(isInstance(oldValue) && scope.trackedMap.has(oldValue)){
-                objectRemovedChanges(scope, oldValue);
-            }
-
-            delete lastInfo.lastState[oldKey];
+        if(isInstance(oldValue) && scope.trackedMap.has(oldValue)){
+            objectRemovedChanges(scope, oldValue);
         }
-        return result;
-    }, changes);
+
+        delete lastInfo.lastState[oldKey];
+    }
 }
 
-function getCurrentChanges(scope, changes, lastInfo, oldKeys, currentKeys, object, scanned, instanceChanges){
-    currentKeys
-    .reduce(function(result, currentKey){
-        var type = ~oldKeys.indexOf(currentKey) ? 'e' : 'a',
-            oldValue = lastInfo.lastState[currentKey],
-            currentValue = object[currentKey],
-            change = [lastInfo.id, currentKey, type],
-            changed = !same(oldValue, currentValue);
+function getRemovedChanges(scope, changes, lastInfo, object){
+    for(var oldKey in lastInfo.lastState){
+        getRemovedChange(scope, changes, lastInfo, object, oldKey);
+    }
+}
 
-        if(changed){
-            if(isInstance(oldValue) && scope.trackedMap.has(oldValue)){
-                objectRemovedChanges(scope, oldValue);
-            }
-        }else{
-            // Previously no key, now key, but value is undefined.
-            if(type === 'a'){
-                result.push(change);
-            }
+function getCurrentChange(scope, changes, lastInfo, object, currentKey, scanned, instanceChanges){
+    var type = currentKey in lastInfo.lastState ? 'e' : 'a',
+        oldValue = lastInfo.lastState[currentKey],
+        currentValue = object[currentKey],
+        change = [lastInfo.id, currentKey, type],
+        changed = !same(oldValue, currentValue);
+
+    if(changed){
+        if(isInstance(oldValue) && scope.trackedMap.has(oldValue)){
+            objectRemovedChanges(scope, oldValue);
         }
-
-        lastInfo.lastState[currentKey] = currentValue;
-
-        if(!isInstance(currentValue)){
-            change.push(currentValue);
-        }else{
-            var valueChanges = getObjectChanges(scope, currentValue, scanned);
-
-            if(valueChanges){
-                change.push([valueChanges.id]);
-
-                result.push.apply(result, valueChanges.changes);
-                instanceChanges.push.apply(instanceChanges, valueChanges.instanceChanges);
-            }
+    }else{
+        // Previously no key, now key, but value is undefined.
+        if(type === 'a'){
+            changes.push(change);
         }
+    }
 
-        if(changed){
-            result.push(change);
+    lastInfo.lastState[currentKey] = currentValue;
+
+    if(!isInstance(currentValue)){
+        change.push(currentValue);
+    }else{
+        var valueChanges = getObjectChanges(scope, currentValue, scanned),
+            valueInfo = scope.trackedMap.get(currentValue);
+
+        valueInfo.occurances++;
+        change.push([valueInfo.id]);
+
+        if(valueChanges){
+            changes.push.apply(changes, valueChanges.changes);
+            instanceChanges.push.apply(instanceChanges, valueChanges.instanceChanges);
         }
+    }
 
-        return result;
-    }, changes);
+    if(changed){
+        changes.push(change);
+    }
+}
+
+function getCurrentChanges(scope, changes, lastInfo, object, scanned, instanceChanges){
+    for(var currentKey in object){
+        getCurrentChange(scope, changes, lastInfo, object, currentKey, scanned, instanceChanges);
+    }
 }
 
 function getObjectChanges(scope, object, scanned){
     var lastInfo = scope.trackedMap.get(object),
-        oldKeys,
-        currentKeys = Object.keys(object),
         newKeys,
         removedKeys,
         instanceChanges = [];
@@ -110,22 +113,15 @@ function getObjectChanges(scope, object, scanned){
         scope.trackedMap.set(object, lastInfo);
 
         instanceChanges.push([lastInfo.id, object]);
-
-        oldKeys = [];
-    }else{
-        oldKeys = Object.keys(lastInfo.lastState);
     }
 
-    lastInfo.occurances++;
-
     var changes = [];
-    getRemovedChanges(scope, changes, lastInfo, oldKeys, currentKeys);
-    getCurrentChanges(scope, changes, lastInfo, oldKeys, currentKeys, object, scanned, instanceChanges);
+    getRemovedChanges(scope, changes, lastInfo, object);
+    getCurrentChanges(scope, changes, lastInfo, object, scanned, instanceChanges);
 
     return {
         instanceChanges: instanceChanges,
-        changes: changes,
-        id: lastInfo.id
+        changes: changes
     };
 }
 
@@ -137,7 +133,7 @@ function changes(){
         var instance = scope.instances[key],
             itemInfo = scope.trackedMap.get(instance);
 
-        if(!itemInfo.occurances){
+        if(instance !== scope.state && !itemInfo.occurances){
             scope.trackedMap.delete(instance);
             delete scope.instances[itemInfo.id];
             changes.push([itemInfo.id, 'r']);
