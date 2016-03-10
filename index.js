@@ -266,7 +266,7 @@ function viscous(state){
     var viscous = {};
 
     var scope = {
-        viscous, viscous,
+        viscous: viscous,
         currentId: 0,
         state: state || {},
         trackedMap: new WeakMap(),
