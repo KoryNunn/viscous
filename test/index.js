@@ -1,6 +1,5 @@
 var test = require('tape'),
-    viscous = require('../'),
-    statham = require('statham');
+    viscous = require('../');
 
 test('simple', function(t){
 
@@ -175,6 +174,67 @@ test('functions', function(t){
         ['0', 'x','a', ['1']]
     ]);
 
+
+});
+
+test('function replication', function(t){
+
+    t.plan(2);
+
+    var a = {b:{}},
+        b = {},
+        differ = viscous(a),
+        differ2 = viscous(b);
+
+    differ2.apply(differ.state());
+
+    var fn1 = function(){
+        t.pass('first function called');
+    };
+
+    var fn2 = function(){
+        t.pass('second function called');
+    };
+
+    a.b = fn1;
+
+    differ2.apply(differ.changes());
+
+    b.b();
+
+    a.b = fn2;
+
+    differ2.apply(differ.changes());
+
+    b.b();
+
+});
+
+test('deep function replication', function(t){
+
+    t.plan(1);
+
+    var a = {b:{}},
+        b = {},
+        differ = viscous(a),
+        differ2 = viscous(b);
+
+    differ2.apply(differ.state());
+
+    a.b = function(){
+        t.fail('function 1 called');
+    };
+
+    differ2.apply(differ.changes());
+
+    a.b = function(){
+        t.pass('function 2 called');
+    };
+
+    differ2.apply(differ.changes());
+
+    b.b();
+
 });
 
 test('arrays', function(t){
@@ -231,6 +291,24 @@ test('arrays with instances', function(t){
 
 });
 
+test('array modification', function(t){
+
+    t.plan(1);
+
+    var a = {x:[1,2,3,4]},
+        differ = viscous(a);
+
+    a.x.splice(1, 1);
+
+    t.deepEqual(differ.changes(), [
+        [],
+        [ '1', '3', 'r'],
+        [ '1', '1', 'e', 3],
+        [ '1', '2', 'e', 4]
+     ]);
+
+});
+
 test('state', function(t){
 
     t.plan(1);
@@ -242,9 +320,9 @@ test('state', function(t){
     a.x.y = {};
 
     t.deepEqual(differ.state(), [[
-        ['2', a.x.y],
-        ['1', a.x],
-        ['0', a]
+        ['2', {}],
+        ['1', {y:['2']}],
+        ['0', {x:['1']}]
     ]]);
 
 });
@@ -264,8 +342,7 @@ test('apply changes', function(t){
 
     differ2.apply(differ.changes());
 
-    t.deepEqual(b, a);
-
+    t.equal(a.x, a.x.y);
 });
 
 test('apply changes via stringify', function(t){
@@ -281,7 +358,7 @@ test('apply changes via stringify', function(t){
     var b = {},
         differ2 = viscous(b);
 
-    var changes = statham.parse(statham.stringify(differ.changes()));
+    var changes = JSON.parse(JSON.stringify(differ.changes()));
 
     differ2.apply(changes);
 
