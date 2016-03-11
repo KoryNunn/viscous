@@ -27,7 +27,7 @@ test('child instances', function(t){
 
     t.deepEqual(differ.changes(), [
         [
-            ['1', a.x]
+            ['1', [{}]]
         ],
         ['0', 'x','a', ['1']]
     ]);
@@ -53,8 +53,8 @@ test('deep instances', function(t){
 
     t.deepEqual(differ.changes(), [
         [
-            ['2', a.x.y],
-            ['1', {y: ['2']}]
+            ['2', [{}]],
+            ['1', [{y: ['2']}]]
         ],
         ['1', 'y','a', ['2']],
         ['0', 'x','a', ['1']]
@@ -73,7 +73,7 @@ test('instance removed', function(t){
 
     t.deepEqual(differ.changes(), [
         [
-            ['1', a.x]
+            ['1', [{}]]
         ],
         ['0', 'x','a', ['1']]
     ]);
@@ -101,8 +101,8 @@ test('deep instances removed', function(t){
 
     t.deepEqual(differ.changes(), [
         [
-            ['2', a.x.y],
-            ['1', {y: ['2']}]
+            ['2', [{}]],
+            ['1', [{y: ['2']}]]
         ],
         ['1', 'y','a', ['2']],
         ['0', 'x','a', ['1']]
@@ -131,7 +131,7 @@ test('instance removed and added', function(t){
 
     t.deepEqual(differ.changes(), [
         [
-            ['1', a.x]
+            ['1', [{}]]
         ],
         ['0', 'x','a', ['1']]
     ]);
@@ -141,7 +141,7 @@ test('instance removed and added', function(t){
 
     t.deepEqual(differ.changes(), [
         [
-            ['2', a.x],
+            ['2', [{}]],
             ['1', 'r']
         ],
         ['0', 'x','e', ['2']]
@@ -163,12 +163,12 @@ test('functions', function(t){
 
     var changes = differ.changes();
 
-    t.deepEqual(changes[0][1][1].y, ['2']);
+    t.deepEqual(changes[0][1][1][0].y, ['2']);
 
     t.deepEqual(changes, [
         [
-            ['2', a.x.y],
-            ['1', changes[0][1][1]], // deep equal doesnt like fns
+            ['2', [{}]],
+            ['1', [changes[0][1][1][0], 'f']], // deep equal doesnt like fns
         ],
         ['1', 'y','a', ['2']],
         ['0', 'x','a', ['1']]
@@ -250,8 +250,8 @@ test('arrays', function(t){
 
     t.deepEqual(differ.changes(), [
         [
-            ['2', obj],
-            ['1', [['2'], 1]]
+            ['2', [{}]],
+            ['1', [{0:['2'], 1:1}, 'a']]
         ],
         ['1', '0','a', ['2']],
         ['1', '1','a', 1],
@@ -280,7 +280,7 @@ test('arrays with instances', function(t){
 
     t.deepEqual(differ.changes(), [
         [
-            ['5', [['2'], ['3'], ['4']]],
+            ['5', [{0:['2'], 1:['3'], 2:['4']}, 'a']],
             ['1', 'r']
        ],
         ['5', '0', 'a', ['2']],
@@ -309,6 +309,41 @@ test('array modification', function(t){
 
 });
 
+test('array properties', function(t){
+
+    t.plan(1);
+
+    var a = {x:[]};
+
+    a.x.y = 'y';
+
+    var differ = viscous(a);
+
+    var state = differ.state();
+
+    t.deepEqual(state, [
+        [
+            ['1', [{y:'y'}, 'a']],
+            ['0', [{x:['1']}]]
+        ]
+    ]);
+});
+
+test('dates', function(t){
+
+    t.plan(1);
+
+    var a = {x:new Date(2016,1,1)},
+        differ = viscous(a);
+
+    t.deepEqual(differ.state(), [
+        [
+            ['1', ['2016-01-31T14:00:00.000Z', 'd']],
+            ['0', [{x:['1']}]]
+        ]
+    ]);
+});
+
 test('state', function(t){
 
     t.plan(1);
@@ -320,29 +355,31 @@ test('state', function(t){
     a.x.y = {};
 
     t.deepEqual(differ.state(), [[
-        ['2', {}],
-        ['1', {y:['2']}],
-        ['0', {x:['1']}]
+        ['2', [{}]],
+        ['1', [{y:['2']}]],
+        ['0', [{x:['1']}]]
     ]]);
 
 });
 
 test('apply changes', function(t){
 
-    t.plan(1);
+    t.plan(2);
 
     var a = {},
         differ = viscous(a);
 
     a.x = {};
     a.x.y = a.x;
+    a.z = new Date(2016,1,1);
 
     var b = {},
         differ2 = viscous(b);
 
     differ2.apply(differ.changes());
 
-    t.equal(a.x, a.x.y);
+    t.equal(b.x, b.x.y);
+    t.equal(b.z.toString(), new Date(2016,1,1).toString());
 });
 
 test('apply changes via stringify', function(t){
@@ -365,5 +402,40 @@ test('apply changes via stringify', function(t){
     t.ok(b.x);
     t.ok(b.x.y);
     t.equal(b.x, b.x.y);
+
+});
+
+test.only('serialiser/deserialisers', function(t){
+    var EventEmitter = require('events');
+
+    function serialise(value){
+        if(value instanceof EventEmitter){
+            return [{}, 'e'];
+        }
+    }
+
+    function deserialise(definition){
+        if(definition[1] === 'e'){
+            return new EventEmitter();
+        }
+    }
+
+    t.plan(1);
+
+    var a = {x: new EventEmitter()},
+        differ = viscous(a, {
+            serialiser: serialise,
+            deserialiser: deserialise
+        });
+
+    var b = {},
+        differ2 = viscous(b, {
+            serialiser: serialise,
+            deserialiser: deserialise
+        });
+
+    differ2.apply(differ.state());
+
+    t.ok(b.x instanceof EventEmitter);
 
 });

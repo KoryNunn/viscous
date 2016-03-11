@@ -120,20 +120,31 @@ function getCurrentChanges(scope, changes, lastInfo, object, scanned, instanceCh
 }
 
 function createInstanceDefinition(scope, instance){
-    var value = instance;
-    if(typeof value === 'function'){
-        value = function(){return instance.apply(this, arguments)};
-    }
-    if(typeof value === 'object'){
-        value = Array.isArray(value) ? [] : {};
+    var result = scope.settings.serialiser(instance);
+
+    if(!result){
+        result = [];
+        var value = instance;
+
+        if(value instanceof Date){
+            return [value.toISOString(), 'd'];
+        }
+
+        if(typeof value === 'function'){
+            result.push(function(){return instance.apply(this, arguments)}, 'f');
+        }else if(Array.isArray(value)){
+            result.push({}, 'a');
+        }else if(value && typeof value === 'object'){
+            result.push({});
+        }
     }
 
     for(var key in instance){
         var id = scope.viscous.getId(instance[key]);
-        value[key] = id ? [id] : instance[key];
+        result[0][key] = id ? [id] : instance[key];
     }
 
-    return value;
+    return result;
 }
 
 function getObjectChanges(scope, object, scanned){
@@ -214,10 +225,38 @@ function applyRootChange(scope, newState){
 }
 
 function inflateDefinition(scope, definition){
-    for(var key in definition){
-        if(Array.isArray(definition[key])){
-            definition[key] = scope.viscous.getInstance(definition[key]);
+    if(Array.isArray(definition)){
+        var type = definition[1],
+            properties = definition[0];
+
+        var result = scope.settings.deserialiser(definition);
+
+        if(result){
+            return result;
         }
+
+        if(!type){
+            result = {};
+        }
+        if(type === 'a'){
+            result = [];
+        }
+        if(type === 'f'){
+            result = properties;
+        }
+        if(type === 'd'){
+            result = new Date(properties);
+        }
+
+        if(result){
+            for(var key in properties){
+                if(Array.isArray(properties[key])){
+                    result[key] = scope.viscous.getInstance(properties[key]);
+                }
+            }
+        }
+
+        return result;
     }
 }
 
@@ -232,11 +271,9 @@ function apply(changes){
             delete scope.instances[instanceChange[0]];
         }else{
             if(scope.instances[instanceChange[0]] === scope.state){
-                inflateDefinition(scope, instanceChange[1]);
-                applyRootChange(scope, instanceChange[1]);
+                applyRootChange(scope, inflateDefinition(scope, instanceChange[1]));
             }else{
-                inflateDefinition(scope, instanceChange[1]);
-                createInstanceInfo(scope, instanceChange[0], instanceChange[1]);
+                createInstanceInfo(scope, instanceChange[0], inflateDefinition(scope, instanceChange[1]));
             }
         }
     });
@@ -262,10 +299,18 @@ function getInstanceById(id){
     return this.instances[id];
 }
 
-function viscous(state){
+function viscous(state, settings){
+    if(!settings){
+        settings = {
+            serialiser: function(){},
+            deserialiser: function(){}
+        };
+    }
+
     var viscous = {};
 
     var scope = {
+        settings: settings,
         viscous: viscous,
         currentId: 0,
         state: state || {},
