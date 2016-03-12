@@ -1,5 +1,13 @@
 var same = require('same-value');
 
+var REMOVED = 'r';
+var ADDED = 'a';
+var EDITED = 'e';
+
+var ARRAY = 'a';
+var FUNCTION = 'f';
+var DATE = 'd';
+
 function isInstance(value){
     var type = typeof value;
     return value && type === 'object' || type === 'function';
@@ -58,7 +66,7 @@ function getInstanceId(value){
 function getRemovedChange(scope, changes, lastInfo, object, oldKey){
     if(!(oldKey in object)){
         var oldValue = lastInfo.lastState[oldKey];
-        changes.push([lastInfo.id, oldKey, 'r']);
+        changes.push([lastInfo.id, oldKey, REMOVED]);
 
         if(isInstance(oldValue) && scope.trackedMap.has(oldValue)){
             objectRemovedChanges(scope, oldValue);
@@ -75,7 +83,7 @@ function getRemovedChanges(scope, changes, lastInfo, object){
 }
 
 function getCurrentChange(scope, changes, lastInfo, object, currentKey, scanned, instanceChanges){
-    var type = currentKey in lastInfo.lastState ? 'e' : 'a',
+    var type = currentKey in lastInfo.lastState ? EDITED : ADDED,
         oldValue = lastInfo.lastState[currentKey],
         currentValue = object[currentKey],
         change = [lastInfo.id, currentKey, type],
@@ -126,13 +134,13 @@ function createInstanceDefinition(scope, instance){
         var value = instance;
 
         if(value instanceof Date){
-            return [value.toISOString(), 'd'];
+            return [value.toISOString(), DATE];
         }
 
         if(typeof value === 'function'){
-            result.push(function(){return instance.apply(this, arguments)}, 'f');
+            result.push(function(){return instance.apply(this, arguments)}, FUNCTION);
         }else if(Array.isArray(value)){
-            result.push({}, 'a');
+            result.push({}, ARRAY);
         }else if(value && typeof value === 'object'){
             result.push({});
         }
@@ -193,7 +201,7 @@ function changes(){
         if(instance !== scope.state && !itemInfo.occurances){
             scope.trackedMap.delete(instance);
             delete scope.instances[itemInfo.id];
-            changes.push([itemInfo.id, 'r']);
+            changes.push([itemInfo.id, REMOVED]);
         }
 
         return changes;
@@ -237,13 +245,13 @@ function inflateDefinition(scope, definition){
         if(!type){
             result = {};
         }
-        if(type === 'a'){
+        if(type === ARRAY){
             result = [];
         }
-        if(type === 'f'){
+        if(type === FUNCTION){
             result = properties;
         }
-        if(type === 'd'){
+        if(type === DATE){
             result = new Date(properties);
         }
 
@@ -264,7 +272,7 @@ function apply(changes){
         instanceChanges = changes[0];
 
     instanceChanges.forEach(function(instanceChange){
-        if(instanceChange[1] === 'r'){
+        if(instanceChange[1] === REMOVED){
             var instance = scope.instances[instanceChange[0]];
             scope.trackedMap.delete(instance);
             delete scope.instances[instanceChange[0]];
@@ -280,7 +288,7 @@ function apply(changes){
     for(var i = 1; i < changes.length; i++){
         var change = changes[i];
 
-        if(change[2] === 'r'){
+        if(change[2] === REMOVED){
             delete scope.instances[change[0]][change[1]];
         }else{
             var value = change[3];
