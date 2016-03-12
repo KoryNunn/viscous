@@ -23,6 +23,41 @@ differ2.apply(changes);
 // Now state2 is deepEqual to state1.
 ```
 
+## Extending serialisation
+
+extended functionality can be added via the `serialiser` and `deserialiser` settings:
+
+```javascript
+
+function serialise(value){
+    if(value instanceof EventEmitter){
+        return [{}, 'emitter']; // MUST return an array of [anything, string type]
+    }
+}
+
+function deserialise(definition){
+    if(definition[1] === 'e'){
+        return new EventEmitter();
+    }
+}
+
+var a = {x: new EventEmitter()},
+    primary = viscous(a, {
+        serialiser: serialise,
+        deserialiser: deserialise
+    });
+
+var b = {},
+    replicant = viscous(b, {
+        serialiser: serialise,
+        deserialiser: deserialise
+    });
+
+replicant.apply(primary.state());
+
+b.x instanceof EventEmitter; // -> true
+```
+
 ## Goals
 
 Fast. instance-tracked. Serialisable. Small serialised diff-size.
