@@ -23,11 +23,12 @@ function objectRemovedChanges(scope, object){
 
 function createInstanceInfo(scope, id, value){
     var lastInfo = {
-        id: id,
-        instance: value,
-        lastState: {},
-        occurances: false
-    };
+            id: id,
+            instance: value,
+            lastState: {},
+            occurances: false
+        };
+
     scope.instances[lastInfo.id] = value;
     scope.trackedMap.set(value, lastInfo);
 
@@ -84,11 +85,9 @@ function getCurrentChange(scope, changes, lastInfo, object, currentKey, scanned,
         if(isInstance(oldValue) && scope.trackedMap.has(oldValue)){
             objectRemovedChanges(scope, oldValue);
         }
-    }else{
-        // Previously no key, now key, but value is undefined.
-        if(type === 'a'){
-            changes.push(change);
-        }
+
+    }else if(type === 'a'){ // Previously no key, now key, but value is undefined.
+        changes.push(change);
     }
 
     lastInfo.lastState[currentKey] = currentValue;

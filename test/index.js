@@ -405,7 +405,7 @@ test('apply changes via stringify', function(t){
 
 });
 
-test.only('serialiser/deserialisers', function(t){
+test('serialiser/deserialisers', function(t){
     var EventEmitter = require('events');
 
     function serialise(value){
