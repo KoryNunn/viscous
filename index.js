@@ -155,20 +155,16 @@ function createInstanceDefinition(scope, instance){
 }
 
 function getObjectChanges(scope, object, scanned){
+    if(scanned.has(object)){
+        return;
+    }
+    scanned.add(object);
+
     var lastInfo = getInstanceInfo(scope, object),
         newKeys,
         removedKeys,
         instanceChanges = [];
 
-    if(!scanned){
-        scanned = new WeakSet();
-    }
-
-    if(scanned.has(object)){
-        return;
-    }
-
-    scanned.add(object);
 
     var isNew = lastInfo.occurances === false && object !== scope.state;
 
@@ -192,7 +188,7 @@ function getObjectChanges(scope, object, scanned){
 
 function changes(){
     var scope = this,
-        result = getObjectChanges(scope, scope.state);
+        result = getObjectChanges(scope, scope.state, new WeakSet());
 
     var instanceChanges = Object.keys(scope.instances).reduce(function(changes, key){
         var instance = scope.instances[key],
