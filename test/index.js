@@ -41,6 +41,33 @@ test('child instances', function(t){
 
 });
 
+test('child instances no extra changes', function(t){
+
+    t.plan(3);
+
+    var a = {},
+        differ = viscous(a);
+
+    a.x = {};
+
+    t.deepEqual(differ.changes(), [
+        [
+            ['1', [{}]]
+        ],
+        ['0', 'x','a', ['1']]
+    ]);
+
+    a.y = 5;
+
+    t.deepEqual(differ.changes(), [
+        [],
+        ['0', 'y','a', 5]
+    ]);
+
+    t.deepEqual(differ.changes(), [[]]);
+
+});
+
 test('deep instances', function(t){
 
     t.plan(1);
@@ -56,8 +83,8 @@ test('deep instances', function(t){
             ['2', [{}]],
             ['1', [{y: ['2']}]]
         ],
-        ['1', 'y','a', ['2']],
-        ['0', 'x','a', ['1']]
+        ['0', 'x','a', ['1']],
+        ['1', 'y','a', ['2']]
     ]);
 
 });
@@ -104,8 +131,8 @@ test('deep instances removed', function(t){
             ['2', [{}]],
             ['1', [{y: ['2']}]]
         ],
-        ['1', 'y','a', ['2']],
-        ['0', 'x','a', ['1']]
+        ['0', 'x','a', ['1']],
+        ['1', 'y','a', ['2']]
     ]);
 
     delete a.x;
@@ -170,8 +197,8 @@ test('functions', function(t){
             ['2', [{}]],
             ['1', [changes[0][1][1][0], 'f']], // deep equal doesnt like fns
         ],
-        ['1', 'y','a', ['2']],
-        ['0', 'x','a', ['1']]
+        ['0', 'x','a', ['1']],
+        ['1', 'y','a', ['2']]
     ]);
 
 
@@ -253,9 +280,9 @@ test('arrays', function(t){
             ['2', [{}]],
             ['1', [{0:['2'], 1:1}, 'a']]
         ],
+        ['0', 'x','a', ['1']],
         ['1', '0','a', ['2']],
-        ['1', '1','a', 1],
-        ['0', 'x','a', ['1']]
+        ['1', '1','a', 1]
     ]);
 
     a.x.shift();
@@ -283,10 +310,10 @@ test('arrays with instances', function(t){
             ['5', [{0:['2'], 1:['3'], 2:['4']}, 'a']],
             ['1', 'r']
        ],
+        ['0', 'x', 'e', ['5']],
         ['5', '0', 'a', ['2']],
         ['5', '1', 'a', ['3']],
-        ['5', '2', 'a', ['4']],
-        ['0', 'x', 'e', ['5']]
+        ['5', '2', 'a', ['4']]
     ]);
 
 });
@@ -380,6 +407,27 @@ test('apply changes', function(t){
 
     t.equal(b.x, b.x.y);
     t.equal(b.z.toString(), new Date(2016,1,1).toString());
+});
+
+test('apply cyclic changes', function(t){
+
+    t.plan(2);
+
+    var foo = [];
+    var bar = {foo:foo};
+    foo.push(bar);
+
+    var source = {foo: foo};
+    var target = {};
+
+    var differ1 = viscous(source);
+    var differ2 = viscous(target);
+
+    differ2.apply(differ1.state());
+
+    t.ok(target.foo);
+    t.equal(target.foo, target.foo[0].foo);
+
 });
 
 test('apply changes via stringify', function(t){
