@@ -139,10 +139,41 @@ test('deep instances removed', function(t){
 
     t.deepEqual(differ.changes(), [
         [
-            ['1', 'r'],
-            ['2', 'r']
+            ['2', 'r'],
+            ['1', 'r']
         ],
         ['0', 'x','r']
+    ]);
+
+});
+
+test.only('deep instances removed only parent', function(t){
+
+    t.plan(2);
+
+    var c = {};
+
+    var b = {c:c};
+
+    var a = {b:b,c:c},
+        differ = viscous(a);
+
+    delete a.b;
+
+    t.deepEqual(differ.changes(), [
+        [
+            ['1', 'r']
+        ],
+        ['0', 'b','r']
+    ]);
+
+    delete a.c;
+
+    t.deepEqual(differ.changes(), [
+        [
+            ['2', 'r']
+        ],
+        ['0', 'c','r']
     ]);
 
 });
@@ -168,8 +199,8 @@ test('instance removed and added', function(t){
 
     t.deepEqual(differ.changes(), [
         [
-            ['2', [{}]],
-            ['1', 'r']
+            ['1', 'r'],
+            ['2', [{}]]
         ],
         ['0', 'x','e', ['2']]
     ]);
@@ -307,8 +338,8 @@ test('arrays with instances', function(t){
 
     t.deepEqual(differ.changes(), [
         [
-            ['5', [{0:['2'], 1:['3'], 2:['4']}, 'a']],
-            ['1', 'r']
+            ['1', 'r'],
+            ['5', [{0:['2'], 1:['3'], 2:['4']}, 'a']]
        ],
         ['0', 'x', 'e', ['5']],
         ['5', '0', 'a', ['2']],
@@ -485,5 +516,49 @@ test('serialiser/deserialisers', function(t){
     differ2.apply(differ.state());
 
     t.ok(b.x instanceof EventEmitter);
+
+});
+
+test('describe', function(t){
+
+    t.plan(3);
+
+    var baz = {majigger: 'whatsits'},
+        thing = {
+        foo: {
+            bar: 1,
+            baz: baz,
+            majigger: baz
+        },
+        baz: baz
+    };
+
+    var differ = viscous(thing);
+
+    t.deepEqual(differ.describe(thing.foo), ['1']);
+    t.equal(differ.describe(1), 1);
+    t.deepEqual(differ.describe({foo: thing.foo}), [{foo: ['1']}]);
+
+});
+
+test('inflate', function(t){
+
+    t.plan(3);
+
+    var baz = {majigger: 'whatsits'},
+        thing = {
+        foo: {
+            bar: 1,
+            baz: baz,
+            majigger: baz
+        },
+        baz: baz
+    };
+
+    var differ = viscous(thing);
+
+    t.equal(differ.inflate(differ.describe(thing.foo)), thing.foo);
+    t.equal(differ.inflate(differ.describe(1)), 1);
+    t.equal(differ.inflate(differ.describe({foo: thing.foo})).foo, thing.foo);
 
 });

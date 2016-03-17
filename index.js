@@ -1,4 +1,4 @@
-var same = require('same-value');
+var sameValue = require('same-value');
 
 var REMOVED = 'r';
 var ADDED = 'a';
@@ -11,6 +11,14 @@ var DATE = 'd';
 function isInstance(value){
     var type = typeof value;
     return value && type === 'object' || type === 'function';
+}
+
+function same(a, b){
+    if(isInstance(a) && a instanceof Date && a !== b){
+        return false;
+    }
+
+    return sameValue(a, b);
 }
 
 function getId(){
@@ -30,17 +38,17 @@ function objectRemovedChanges(scope, object){
 }
 
 function createInstanceInfo(scope, id, value){
-    var lastInfo = {
+    var instanceInfo = {
             id: id,
             instance: value,
             lastState: {},
             occurances: false
         };
 
-    scope.instances[lastInfo.id] = value;
-    scope.trackedMap.set(value, lastInfo);
+    scope.instances[instanceInfo.id] = value;
+    scope.trackedMap.set(value, instanceInfo);
 
-    return lastInfo;
+    return instanceInfo;
 }
 
 function getInstanceInfo(scope, value){
@@ -48,13 +56,13 @@ function getInstanceInfo(scope, value){
         return;
     }
 
-    var lastInfo = scope.trackedMap.get(value);
+    var instanceInfo = scope.trackedMap.get(value);
 
-    if(!lastInfo){
-        lastInfo = createInstanceInfo(scope, scope.getId(), value);
+    if(!instanceInfo){
+        instanceInfo = createInstanceInfo(scope, scope.getId(), value);
     }
 
-    return lastInfo;
+    return instanceInfo;
 }
 
 function getInstanceId(value){
@@ -63,75 +71,64 @@ function getInstanceId(value){
     return info && info.id;
 }
 
-function getRemovedChange(changes, lastInfo, object, oldKey){
+function getRemovedChange(instanceInfo, object, oldKey){
     var scope = this;
 
     if(!(oldKey in object)){
-        var oldValue = lastInfo.lastState[oldKey];
-        changes.push([lastInfo.id, oldKey, REMOVED]);
+        var oldValue = instanceInfo.lastState[oldKey];
+        this.nextChange.push([instanceInfo.id, oldKey, REMOVED]);
 
         if(isInstance(oldValue) && scope.trackedMap.has(oldValue)){
             objectRemovedChanges(scope, oldValue);
         }
 
-        delete lastInfo.lastState[oldKey];
+        delete instanceInfo.lastState[oldKey];
     }
 }
 
-function getRemovedChanges(changes, lastInfo, object){
+function getRemovedChanges(instanceInfo, object){
     function getChange(oldKey){
-        this.getRemovedChange(changes, lastInfo, object, oldKey);
+        this.getRemovedChange(instanceInfo, object, oldKey);
     }
 
-    Object.keys(lastInfo.lastState).forEach(getChange, this);
+    Object.keys(instanceInfo.lastState).forEach(getChange, this);
 }
 
-function getCurrentChange(changes, lastInfo, object, currentKey, scanned, instanceChanges){
+function getCurrentChange(instanceInfo, object, currentKey){
     var scope = this;
 
-    var type = currentKey in lastInfo.lastState ? EDITED : ADDED,
-        oldValue = lastInfo.lastState[currentKey],
+    var type = currentKey in instanceInfo.lastState ? EDITED : ADDED,
+        oldValue = instanceInfo.lastState[currentKey],
         currentValue = object[currentKey],
-        change = [lastInfo.id, currentKey, type],
+        change = [instanceInfo.id, currentKey, type],
         changed = !same(oldValue, currentValue);
 
-
-    if(changed){
-        changes.push(change);
-        if(isInstance(oldValue) && scope.trackedMap.has(oldValue)){
+    if(changed || type === ADDED){
+        instanceInfo.lastState[currentKey] = currentValue;
+        this.nextChange.push(change);
+        if(changed && isInstance(oldValue) && scope.trackedMap.has(oldValue)){
             objectRemovedChanges(scope, oldValue);
         }
-    }else if(type === ADDED){ // Previously no key, now key, but value is undefined.
-        changes.push(change);
-        lastInfo.lastState[currentKey] = currentValue;
-        return;
     }
-
 
     if(!isInstance(currentValue)){
         change.push(currentValue);
-        lastInfo.lastState[currentKey] = currentValue;
         return;
     }
 
-    var valueChanges = scope.getObjectChanges(currentValue, scanned),
-        valueInfo = scope.trackedMap.get(currentValue);
+    scope.getObjectChanges(currentValue);
 
     if(changed){
+        var valueInfo = scope.trackedMap.get(currentValue);
+
         valueInfo.occurances++;
         change.push([valueInfo.id]);
-        lastInfo.lastState[currentKey] = currentValue;
-    }
-
-    if(valueChanges && (valueChanges.changes.length || valueChanges.instanceChanges.length)){
-        changes.push.apply(changes, valueChanges.changes);
-        instanceChanges.push.apply(instanceChanges, valueChanges.instanceChanges);
     }
 }
 
-function getCurrentChanges(changes, lastInfo, object, scanned, instanceChanges){
+function getCurrentChanges(instanceInfo, object){
     function getChange(currentKey){
-        this.getCurrentChange(changes, lastInfo, object, currentKey, scanned, instanceChanges);
+        this.getCurrentChange(instanceInfo, object, currentKey);
     }
 
     Object.keys(object).forEach(getChange, this);
@@ -165,56 +162,58 @@ function createInstanceDefinition(scope, instance){
     return result;
 }
 
-function getObjectChanges(object, scanned){
-    if(scanned.has(object)){
+function getCleanChangesArray(){
+
+}
+
+function getObjectChanges(object){
+    if(this.scanned.has(object)){
         return;
     }
-    scanned.add(object);
+    this.scanned.add(object);
 
     var scope = this;
 
-    var lastInfo = getInstanceInfo(scope, object),
-        instanceChanges = [],
-        isNew = lastInfo.occurances === false && object !== scope.state;
+    var instanceInfo = getInstanceInfo(scope, object),
+        isNew = instanceInfo.occurances === false && object !== scope.state;
 
     if(isNew){
-        lastInfo.occurances = 0;
+        instanceInfo.occurances = 0;
     }
 
-    var changes = [];
-    scope.getRemovedChanges(changes, lastInfo, object);
-    scope.getCurrentChanges(changes, lastInfo, object, scanned, instanceChanges);
+    scope.getRemovedChanges(instanceInfo, object);
 
-    if(isNew){
-        instanceChanges.push([lastInfo.id, createInstanceDefinition(scope, object)]);
+    scope.getCurrentChanges(instanceInfo, object);
+
+    if(!isNew){
+        return;
     }
 
-    return {
-        instanceChanges: instanceChanges,
-        changes: changes
-    };
+    this.nextChange[0].push([instanceInfo.id, createInstanceDefinition(scope, object)]);
 }
 
 function changes(){
-    var scope = this,
-        result = scope.getObjectChanges(scope.state, new WeakSet());
+    var scope = this;
 
-    var instanceChanges = Object.keys(scope.instances).reduce(function(changes, key){
+    // This is how not to write code 101,
+    // But anything in the name of performance :P
+    scope.nextChange[0] = [];
+    scope.scanned = new WeakSet();
+
+    scope.getObjectChanges(scope.state);
+
+    Object.keys(scope.instances).forEach(function(key){
         var instance = scope.instances[key],
             itemInfo = scope.trackedMap.get(instance);
 
         if(instance !== scope.state && itemInfo.occurances < 1){
             scope.trackedMap.delete(instance);
             delete scope.instances[itemInfo.id];
-            changes.push([itemInfo.id, REMOVED]);
+            scope.nextChange[0].unshift([itemInfo.id, REMOVED]);
         }
+    });
 
-        return changes;
-    }, []);
-
-    var changes = [result.instanceChanges.concat(instanceChanges)].concat(result.changes);
-
-    return changes;
+    return scope.nextChange.splice(0, scope.nextChange.length);
 }
 
 function getState(){
@@ -227,27 +226,33 @@ function getState(){
     })];
 }
 
-function applyRootChange(scope, newState, toInflate){
+function applyObjectChange(target, newState, toInflate){
     if(Array.isArray(newState)){
         newState = newState[0];
-        toInflate.push([scope.state, newState]);
+        toInflate.push([target, newState]);
     }
 
-    Object.keys(scope.state).forEach(function(key){
+    Object.keys(target).forEach(function(key){
         if(!key in newState){
-            delete scope.state[key];
+            delete target[key];
         }
     });
 
     Object.keys(newState).forEach(function(key){
-        scope.state[key] = newState[key];
+        target[key] = newState[key];
     });
+}
+
+function applyRootChange(scope, newState, toInflate){
+    applyObjectChange(scope.state, newState, toInflate);
 }
 
 function inflateDefinition(scope, result, properties){
     Object.keys(properties).forEach(function(key){
         if(Array.isArray(properties[key])){
             result[key] = scope.viscous.getInstance(properties[key][0]);
+        }else{
+            result[key] = properties[key];
         }
     });
 }
@@ -328,6 +333,39 @@ function getInstanceById(id){
     return this.instances[id];
 }
 
+function describe(data){
+    if(isInstance(data)){
+        if(this.trackedMap.has(data)){
+            return [this.viscous.getId(data)];
+        }
+        return createInstanceDefinition(this, data);
+    }
+
+    return data;
+}
+
+function inflate(description){
+    var scope = this;
+
+    if(Array.isArray(description) && typeof description[0] === 'string'){
+        return scope.viscous.getInstance(description[0]);
+    }
+
+    if(isInstance(description)){
+        var toInflate = [];
+
+        var result = createInstance(scope, description, toInflate);
+
+        toInflate.forEach(function(change){
+            inflateDefinition(scope, change[0], change[1]);
+        });
+
+        return result;
+    }
+
+    return description;
+}
+
 function viscous(state, settings){
     if(!settings){
         settings = {
@@ -339,6 +377,7 @@ function viscous(state, settings){
     var viscous = {};
 
     var scope = {
+        nextChange: [],
         settings: settings,
         viscous: viscous,
         currentId: 0,
@@ -361,6 +400,8 @@ function viscous(state, settings){
     viscous.state = getState.bind(scope);
     viscous.getId = getInstanceId.bind(scope);
     viscous.getInstance = getInstanceById.bind(scope);
+    viscous.describe = describe.bind(scope);
+    viscous.inflate = inflate.bind(scope);
 
     viscous.changes();
 
