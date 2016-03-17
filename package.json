@@ -1,6 +1,6 @@
 {
   "name": "viscous",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "serialisable appliable state differ",
   "main": "index.js",
   "scripts": {
