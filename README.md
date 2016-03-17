@@ -23,6 +23,37 @@ differ2.apply(changes);
 // Now state2 is deepEqual to state1.
 ```
 
+## Methods
+
+### viscous.changes()
+
+Returns a set of changes since the last time it was called.
+
+### viscous.apply()
+
+Applies a set of changes
+
+### viscous.state()
+
+Returns a set of changes that describes the current state.
+
+### viscous.getId(instance)
+
+returns the internal id of the instance, or undefined if the instance does not exist in `state`
+
+### viscous.getInstance(id)
+
+returns the instance for the given id, assuming it exists.
+
+### viscous.describe(anything)
+
+returns a description of anything, including information about ids of tracked instances.
+
+### viscous.inflate(description)
+
+inflates a description into whever was described, including instances that exist in `state`
+
+
 ## Extending serialisation
 
 extended functionality can be added via the `serialiser` and `deserialiser` settings:
@@ -58,6 +89,12 @@ replicant.apply(primary.state());
 b.x instanceof EventEmitter; // -> true
 ```
 
+
+
 ## Goals
 
 Fast. instance-tracked. Serialisable. Small serialised diff-size.
+
+## Caveats
+
+viscous only looks at own properties, but if you need to handle prototypical properties, you can always use custom serialise/deserialisers

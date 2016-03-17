@@ -147,7 +147,7 @@ test('deep instances removed', function(t){
 
 });
 
-test.only('deep instances removed only parent', function(t){
+test('deep instances removed only parent', function(t){
 
     t.plan(2);
 
