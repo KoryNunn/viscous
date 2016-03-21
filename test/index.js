@@ -6,14 +6,15 @@ test('simple', function(t){
     t.plan(1);
 
     var a = {},
-        differ = viscous(a);
+        b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
 
     a.x = 1;
 
-    t.deepEqual(differ.changes(), [
-        [],
-        ['0', 'x','a', 1]
-    ]);
+    differ2.apply(differ1.changes());
+
+    t.deepEqual(b, a);
 });
 
 test('child instances', function(t){
@@ -21,50 +22,40 @@ test('child instances', function(t){
     t.plan(2);
 
     var a = {},
-        differ = viscous(a);
+        b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
 
     a.x = {};
 
-    t.deepEqual(differ.changes(), [
-        [
-            ['1', [{}]]
-        ],
-        ['0', 'x','a', ['1']]
-    ]);
+    differ2.apply(differ1.changes());
+
+    t.deepEqual(b, a);
 
     a.y = 5;
 
-    t.deepEqual(differ.changes(), [
-        [],
-        ['0', 'y','a', 5]
-    ]);
+    differ2.apply(differ1.changes());
+
+    t.deepEqual(b, a);
 
 });
 
 test('child instances no extra changes', function(t){
 
-    t.plan(3);
+    t.plan(2);
 
     var a = {},
-        differ = viscous(a);
+        b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
 
     a.x = {};
 
-    t.deepEqual(differ.changes(), [
-        [
-            ['1', [{}]]
-        ],
-        ['0', 'x','a', ['1']]
-    ]);
+    differ2.apply(differ1.changes());
 
-    a.y = 5;
+    t.deepEqual(b, a);
 
-    t.deepEqual(differ.changes(), [
-        [],
-        ['0', 'y','a', 5]
-    ]);
-
-    t.deepEqual(differ.changes(), [[]]);
+    t.deepEqual(differ1.changes(), [[]]);
 
 });
 
@@ -73,19 +64,16 @@ test('deep instances', function(t){
     t.plan(1);
 
     var a = {},
-        differ = viscous(a);
+        b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
 
     a.x = {};
     a.x.y = {};
 
-    t.deepEqual(differ.changes(), [
-        [
-            ['2', [{}]],
-            ['1', [{y: ['2']}]]
-        ],
-        ['0', 'x','a', ['1']],
-        ['1', 'y','a', ['2']]
-    ]);
+    differ2.apply(differ1.changes());
+
+    t.deepEqual(b, a);
 
 });
 
@@ -94,25 +82,21 @@ test('instance removed', function(t){
     t.plan(2);
 
     var a = {},
-        differ = viscous(a);
+        b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
 
     a.x = {};
 
-    t.deepEqual(differ.changes(), [
-        [
-            ['1', [{}]]
-        ],
-        ['0', 'x','a', ['1']]
-    ]);
+    differ2.apply(differ1.changes());
+
+    t.deepEqual(b, a);
 
     delete a.x;
 
-    t.deepEqual(differ.changes(), [
-        [
-            ['1', 'r']
-        ],
-        ['0', 'x','r']
-    ]);
+    differ2.apply(differ1.changes());
+
+    t.deepEqual(b, a);
 
 });
 
@@ -121,29 +105,22 @@ test('deep instances removed', function(t){
     t.plan(2);
 
     var a = {},
-        differ = viscous(a);
+        b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
 
     a.x = {};
     a.x.y = {};
 
-    t.deepEqual(differ.changes(), [
-        [
-            ['2', [{}]],
-            ['1', [{y: ['2']}]]
-        ],
-        ['0', 'x','a', ['1']],
-        ['1', 'y','a', ['2']]
-    ]);
+    differ2.apply(differ1.changes());
+
+    t.deepEqual(b, a);
 
     delete a.x;
 
-    t.deepEqual(differ.changes(), [
-        [
-            ['2', 'r'],
-            ['1', 'r']
-        ],
-        ['0', 'x','r']
-    ]);
+    differ2.apply(differ1.changes());
+
+    t.deepEqual(b, a);
 
 });
 
@@ -151,30 +128,28 @@ test('deep instances removed only parent', function(t){
 
     t.plan(2);
 
-    var c = {};
+    var ac = {};
 
-    var b = {c:c};
+    var ab = {c:ac};
 
-    var a = {b:b,c:c},
-        differ = viscous(a);
+    var a = {b:ab,c:ac},
+        b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
+
+    differ2.apply(differ1.state());
 
     delete a.b;
 
-    t.deepEqual(differ.changes(), [
-        [
-            ['1', 'r']
-        ],
-        ['0', 'b','r']
-    ]);
+    differ2.apply(differ1.changes());
+
+    t.deepEqual(b, a);
 
     delete a.c;
 
-    t.deepEqual(differ.changes(), [
-        [
-            ['2', 'r']
-        ],
-        ['0', 'c','r']
-    ]);
+    differ2.apply(differ1.changes());
+
+    t.deepEqual(b, a);
 
 });
 
@@ -183,56 +158,40 @@ test('instance removed and added', function(t){
     t.plan(2);
 
     var a = {},
-        differ = viscous(a);
+        b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
 
-    a.x = {};
+    differ2.apply(differ1.changes());
 
-    t.deepEqual(differ.changes(), [
-        [
-            ['1', [{}]]
-        ],
-        ['0', 'x','a', ['1']]
-    ]);
+    t.deepEqual(b, a);
 
     delete a.x;
     a.x = {};
 
-    t.deepEqual(differ.changes(), [
-        [
-            ['1', 'r'],
-            ['2', [{}]]
-        ],
-        ['0', 'x','e', ['2']]
-    ]);
+    differ2.apply(differ1.changes());
+
+    t.deepEqual(b, a);
 
 });
 
 test('functions', function(t){
 
-    t.plan(2);
+    t.plan(1);
 
     var a = {},
-        differ = viscous(a);
+        b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
 
     a.x = function(){
         return 20;
     };
     a.x.y = {};
 
-    var changes = differ.changes();
+    differ2.apply(differ1.changes());
 
-    t.deepEqual(changes[0][1][1][0].y, ['2']);
-
-    t.deepEqual(changes, [
-        [
-            ['2', [{}]],
-            ['1', [changes[0][1][1][0], 'f']], // deep equal doesnt like fns
-        ],
-        ['0', 'x','a', ['1']],
-        ['1', 'y','a', ['2']]
-    ]);
-
-
+    t.deepEqual(b.x(), a.x());
 });
 
 test('function replication', function(t){
@@ -300,30 +259,24 @@ test('arrays', function(t){
     t.plan(2);
 
     var a = {},
-        differ = viscous(a);
+        b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
 
     var obj = {};
 
     a.x = [obj, 1];
 
-    t.deepEqual(differ.changes(), [
-        [
-            ['2', [{}]],
-            ['1', [{0:['2'], 1:1}, 'a']]
-        ],
-        ['0', 'x','a', ['1']],
-        ['1', '0','a', ['2']],
-        ['1', '1','a', 1]
-    ]);
+    differ2.apply(differ1.changes());
+
+    t.deepEqual(b, a);
 
     a.x.shift();
     a.x.push(obj);
 
-    t.deepEqual(differ.changes(), [
-        [],
-        ['1', '0','e', 1],
-        ['1', '1','e', ['2']],
-    ]);
+    differ2.apply(differ1.changes());
+
+    t.deepEqual(b, a);
 
 });
 
@@ -332,20 +285,15 @@ test('arrays with instances', function(t){
     t.plan(1);
 
     var a = {x:[{},{},{}]},
-        differ = viscous(a);
+        b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
 
     a.x = a.x.slice();
 
-    t.deepEqual(differ.changes(), [
-        [
-            ['1', 'r'],
-            ['5', [{0:['2'], 1:['3'], 2:['4']}, 'a']]
-       ],
-        ['0', 'x', 'e', ['5']],
-        ['5', '0', 'a', ['2']],
-        ['5', '1', 'a', ['3']],
-        ['5', '2', 'a', ['4']]
-    ]);
+    differ2.apply(differ1.state());
+
+    t.deepEqual(b, a);
 
 });
 
@@ -354,16 +302,15 @@ test('array modification', function(t){
     t.plan(1);
 
     var a = {x:[1,2,3,4]},
-        differ = viscous(a);
+        b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
 
     a.x.splice(1, 1);
 
-    t.deepEqual(differ.changes(), [
-        [],
-        [ '1', '3', 'r'],
-        [ '1', '1', 'e', 3],
-        [ '1', '2', 'e', 4]
-     ]);
+    differ2.apply(differ1.state());
+
+    t.deepEqual(b, a);
 
 });
 
@@ -375,16 +322,13 @@ test('array properties', function(t){
 
     a.x.y = 'y';
 
-    var differ = viscous(a);
+    var b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
 
-    var state = differ.state();
+    differ2.apply(differ1.state());
 
-    t.deepEqual(state, [
-        [
-            ['1', [{y:'y'}, 'a']],
-            ['0', [{x:['1']}]]
-        ]
-    ]);
+    t.deepEqual(b, a);
 });
 
 test('dates', function(t){
@@ -392,14 +336,13 @@ test('dates', function(t){
     t.plan(1);
 
     var a = {x:new Date(2016,1,1)},
-        differ = viscous(a);
+        b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
 
-    t.deepEqual(differ.state(), [
-        [
-            ['1', ['2016-01-31T14:00:00.000Z', 'd']],
-            ['0', [{x:['1']}]]
-        ]
-    ]);
+    differ2.apply(differ1.state());
+
+    t.deepEqual(b, a);
 });
 
 test('state', function(t){
@@ -407,16 +350,16 @@ test('state', function(t){
     t.plan(1);
 
     var a = {},
-        differ = viscous(a);
+        b = {},
+        differ1 = viscous(a),
+        differ2 = viscous(b);
 
     a.x = {};
     a.x.y = {};
 
-    t.deepEqual(differ.state(), [[
-        ['2', [{}]],
-        ['1', [{y:['2']}]],
-        ['0', [{x:['1']}]]
-    ]]);
+    differ2.apply(differ1.state());
+
+    t.deepEqual(b, a);
 
 });
 
@@ -425,7 +368,7 @@ test('apply changes', function(t){
     t.plan(2);
 
     var a = {},
-        differ = viscous(a);
+        differ1 = viscous(a);
 
     a.x = {};
     a.x.y = a.x;
@@ -434,7 +377,7 @@ test('apply changes', function(t){
     var b = {},
         differ2 = viscous(b);
 
-    differ2.apply(differ.changes());
+    differ2.apply(differ1.changes());
 
     t.equal(b.x, b.x.y);
     t.equal(b.z.toString(), new Date(2016,1,1).toString());
@@ -519,29 +462,7 @@ test('serialiser/deserialisers', function(t){
 
 });
 
-test('describe', function(t){
-
-    t.plan(3);
-
-    var baz = {majigger: 'whatsits'},
-        thing = {
-        foo: {
-            bar: 1,
-            baz: baz,
-            majigger: baz
-        },
-        baz: baz
-    };
-
-    var differ = viscous(thing);
-
-    t.deepEqual(differ.describe(thing.foo), ['1']);
-    t.equal(differ.describe(1), 1);
-    t.deepEqual(differ.describe({foo: thing.foo}), [{foo: ['1']}]);
-
-});
-
-test('inflate', function(t){
+test('describe/inflate', function(t){
 
     t.plan(3);
 

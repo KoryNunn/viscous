@@ -1,5 +1,4 @@
 var sameValue = require('same-value');
-
 var REMOVED = 'r';
 var ADDED = 'a';
 var EDITED = 'e';
@@ -21,8 +20,15 @@ function same(a, b){
     return sameValue(a, b);
 }
 
-function getId(){
-    return (this.currentId++).toString(36);
+function getId(int){
+    if(int === 0){
+        return 'root';
+    }
+    return this.viscousId + ':' + int.toString(36);
+}
+
+function createId(){
+    return this.getId(this.currentId++);
 }
 
 function createInstanceInfo(scope, id, value){
@@ -33,7 +39,7 @@ function createInstanceInfo(scope, id, value){
             new: true
         };
 
-    scope.instances[instanceInfo.id] = value;
+    scope.setInstance(id, value);
     scope.trackedMap.set(value, instanceInfo);
 
     return instanceInfo;
@@ -47,7 +53,7 @@ function getInstanceInfo(scope, value){
     var instanceInfo = scope.trackedMap.get(value);
 
     if(!instanceInfo){
-        instanceInfo = createInstanceInfo(scope, scope.getId(), value);
+        instanceInfo = createInstanceInfo(scope, scope.createId(), value);
     }
 
     return instanceInfo;
@@ -97,7 +103,7 @@ function getCurrentChange(instanceInfo, instance, currentKey){
         return;
     }
 
-    var instanceId = scope.viscous.getId(instance[currentKey]);
+    var instanceId = scope.getInstanceId(instance[currentKey]);
 
     scope.currentInstances.add(instanceId);
 
@@ -137,7 +143,7 @@ function createInstanceDefinition(scope, instance){
     }
 
     Object.keys(instance).forEach(function(key){
-        var id = scope.viscous.getId(instance[key]);
+        var id = scope.getInstanceId(instance[key]);
         result[0][key] = id ? [id] : instance[key];
     });
 
@@ -169,8 +175,8 @@ function getObjectChanges(object){
 function createGarbageChange(id){
     var scope = this;
     if(!scope.currentInstances.has(id)){
-        scope.trackedMap.delete(scope.instances[id]);
-        delete scope.instances[id];
+        scope.trackedMap.delete(scope.getInstance(id));
+        scope.removeInstance(id);
         scope.nextChange[0].unshift([id, REMOVED]);
     }
 }
@@ -184,7 +190,7 @@ function changes(){
     scope.nextChange[0] = [];
     scope.scanned = new WeakSet();
     scope.currentInstances.clear();
-    scope.currentInstances.add('0');
+    scope.currentInstances.add(this.getId(0));
 
     scope.getObjectChanges(scope.state);
 
@@ -196,7 +202,7 @@ function changes(){
 function getState(){
     var scope = this;
 
-    scope.viscous.changes();
+    scope.changes();
 
     return [Object.keys(scope.instances).reverse().map(function(key){
         return [key, createInstanceDefinition(scope, scope.instances[key])];
@@ -227,7 +233,7 @@ function applyRootChange(scope, newState, toInflate){
 function inflateDefinition(scope, result, properties){
     Object.keys(properties).forEach(function(key){
         if(Array.isArray(properties[key])){
-            result[key] = scope.viscous.getInstance(properties[key][0]);
+            result[key] = scope.getInstance(properties[key][0]);
         }else{
             result[key] = properties[key];
         }
@@ -273,14 +279,20 @@ function apply(changes){
 
     instanceChanges.forEach(function(instanceChange){
         if(instanceChange[1] === REMOVED){
-            var instance = scope.instances[instanceChange[0]];
+            var instance = scope.getInstance(instanceChange[0]);
             scope.trackedMap.delete(instance);
-            delete scope.instances[instanceChange[0]];
+            scope.removeInstance(instanceChange[0]);
         }else{
-            if(scope.viscous.getInstance(instanceChange[0]) === scope.state){
+            if(scope.getInstance(instanceChange[0]) === scope.state){
                 applyRootChange(scope, instanceChange[1], toInflate);
             }else{
-                createInstanceInfo(scope, instanceChange[0], createInstance(scope, instanceChange[1], toInflate));
+                var existingInstance = scope.getInstance(instanceChange[0]);
+
+                if(existingInstance){
+                    toInflate.push([existingInstance, instanceChange[1][0]]);
+                }else{
+                   createInstanceInfo(scope, instanceChange[0], createInstance(scope, instanceChange[1], toInflate));
+               }
             }
         }
     });
@@ -293,15 +305,15 @@ function apply(changes){
         var change = changes[i];
 
         if(change[2] === REMOVED){
-            delete scope.instances[change[0]][change[1]];
+            delete scope.getInstance(change[0])[change[1]];
         }else{
             var value = change[3];
 
             if(Array.isArray(change[3])){
-                value = scope.instances[change[3]];
+                value = scope.getInstance(change[3]);
             }
 
-            scope.instances[change[0]][change[1]] = value;
+            scope.getInstance(change[0])[change[1]] = value;
         }
     }
 }
@@ -310,12 +322,46 @@ function getInstanceById(id){
     return this.instances[id];
 }
 
+function setInstanceById(id, value){
+    this.instances[id] = value;
+}
+
+function removeInstanceById(id){
+    delete this.instances[id];
+}
+
+function buildIdMap(scope, data, ids){
+    if(!isInstance(data)){
+        return;
+    }
+
+    if(scope.trackedMap.has(data)){
+        ids[scope.getInstanceId(data)] = data;
+        return ids;
+    }
+
+    ids[scope.getInstanceId(data)] = data;
+
+    for(var key in data){
+        buildIdMap(scope, data[key], ids);
+    }
+
+    return ids;
+}
+
 function describe(data){
+    var scope = this;
+
     if(isInstance(data)){
-        if(this.trackedMap.has(data)){
-            return [this.viscous.getId(data)];
+        if(scope.trackedMap.has(data)){
+            return [scope.getInstanceId(data)];
         }
-        return createInstanceDefinition(this, data);
+
+        var ids = buildIdMap(scope, data, {});
+
+        return Object.keys(ids).map(function(key){
+            return [key, createInstanceDefinition(scope, scope.instances[key])];
+        });
     }
 
     return data;
@@ -325,19 +371,15 @@ function inflate(description){
     var scope = this;
 
     if(Array.isArray(description) && typeof description[0] === 'string'){
-        return scope.viscous.getInstance(description[0]);
+        return scope.getInstance(description[0]);
     }
 
     if(isInstance(description)){
         var toInflate = [];
 
-        var result = createInstance(scope, description, toInflate);
+        scope.viscous.apply([description]);
 
-        toInflate.forEach(function(change){
-            inflateDefinition(scope, change[0], change[1]);
-        });
-
-        return result;
+        return scope.getInstance(description[0][0]);
     }
 
     return description;
@@ -358,6 +400,7 @@ function viscous(state, settings){
         currentInstances: new Set(),
         settings: settings,
         viscous: viscous,
+        viscousId: settings.viscousId || parseInt(Math.random() * Math.pow(36,2)).toString(36),
         currentId: 0,
         state: state || {},
         trackedMap: new WeakMap(),
@@ -370,14 +413,20 @@ function viscous(state, settings){
     scope.getRemovedChanges = getRemovedChanges.bind(scope);
     scope.getRemovedChange = getRemovedChange.bind(scope);
     scope.getObjectChanges = getObjectChanges.bind(scope);
+    scope.getInstance = getInstanceById.bind(scope);
+    scope.setInstance = setInstanceById.bind(scope);
+    scope.removeInstance = removeInstanceById.bind(scope);
+    scope.getInstanceId = getInstanceId.bind(scope);
+    scope.changes = changes.bind(scope);
 
     scope.getId = getId.bind(scope);
+    scope.createId = createId.bind(scope);
 
-    viscous.changes = changes.bind(scope);
+    viscous.changes = scope.changes;
     viscous.apply = apply.bind(scope);
     viscous.state = getState.bind(scope);
-    viscous.getId = getInstanceId.bind(scope);
-    viscous.getInstance = getInstanceById.bind(scope);
+    viscous.getId = scope.getInstanceId;
+    viscous.getInstance = scope.getInstance;
     viscous.describe = describe.bind(scope);
     viscous.inflate = inflate.bind(scope);
 

@@ -89,7 +89,13 @@ replicant.apply(primary.state());
 b.x instanceof EventEmitter; // -> true
 ```
 
+## Avoiding instance collisions.
 
+You can pass a viscousId via settings, and all internal instance IDs will be prefixed with that.
+
+I'm not super happy with this solution at the moment.
+
+Good luck!
 
 ## Goals
 
