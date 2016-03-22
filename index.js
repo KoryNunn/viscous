@@ -1,4 +1,6 @@
-var sameValue = require('same-value');
+var sameValue = require('same-value'),
+    isInstance = require('is-instance');
+
 var REMOVED = 'r';
 var ADDED = 'a';
 var EDITED = 'e';
@@ -6,11 +8,6 @@ var EDITED = 'e';
 var ARRAY = 'a';
 var FUNCTION = 'f';
 var DATE = 'd';
-
-function isInstance(value){
-    var type = typeof value;
-    return value && type === 'object' || type === 'function';
-}
 
 function same(a, b){
     if(isInstance(a) && a instanceof Date && a !== b){

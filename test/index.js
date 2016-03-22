@@ -481,5 +481,18 @@ test('describe/inflate', function(t){
     t.equal(differ.inflate(differ.describe(thing.foo)), thing.foo);
     t.equal(differ.inflate(differ.describe(1)), 1);
     t.equal(differ.inflate(differ.describe({foo: thing.foo})).foo, thing.foo);
+});
 
+test('describe/inflate cyclic data', function(t){
+
+    t.plan(1);
+
+    var x = {};
+    x.x = x;
+
+    var differ = viscous(x);
+
+    var y = differ.inflate(differ.describe(x));
+
+    t.equal(y, y.x);
 });
