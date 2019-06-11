@@ -67,7 +67,7 @@ function serialise(value){
 }
 
 function deserialise(definition){
-    if(definition[1] === 'e'){
+    if(definition[1] === 'emitter'){
         return new EventEmitter();
     }
 }
